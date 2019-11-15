@@ -186,7 +186,7 @@ with lib;
         default = '''';
         description = ''
           Extra configuration put at the end of config.xml.
-          Note that it must not include <yandex> tags.
+          Note that it must not include &lt;yandex&gt; tags.
         '';
       };
 
