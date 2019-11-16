@@ -1,7 +1,24 @@
 { config, lib, pkgs, ... }:
 let
   cfg = config.services.clickhouse;
-  mkConfig = cfg: pkgs.writeText "config.xml" ''
+  createProfile = n: p: ''
+  <${n}>
+    ${if p.max_threads != null
+       then "<max_threads>" + toString p.max_threads + "</max_threads>"
+       else ""}
+
+    ${if p.max_memory_usage != null
+       then "<max_memory_usage>" + toString p.max_memory_usage + "</max_memory_usage>"
+       else ""}
+
+    <use_uncompressed_cache>${if p.use_uncompressed_cache then "1" else "0"}</use_uncompressed_cache>
+    <load_balancing>${p.load_balancing}</load_balancing>
+    <readonly>${if p.readonly then "1" else "0"}</readonly>
+
+    ${p.extraConfig}
+  </${n}>
+  '';
+  createConfig = cfg: pkgs.writeText "config.xml" ''
 <?xml version="1.0"?>
 <yandex>
     <logger>
@@ -21,7 +38,7 @@ let
       then "<interserver_http_host>" + cfg.interserver_http_host + "</interserver_http_host>"
       else ""}
 
-    ${lib.strings.concatMapStrings (a: "<listen_host>"+a+"</listen_host>\n") cfg.host}
+    ${lib.strings.concatMapStrings (a: "<listen>"+a+"</listen>\n") cfg.host}
 
     <listen_reuse_port>${if cfg.reuse_port then "1" else "0"}</listen_reuse_port>
     <max_connections>${toString cfg.max_connections}</max_connections>
@@ -42,7 +59,7 @@ let
     <user_files_path>/var/lib/clickhouse/user_files/</user_files_path>
 
     <!-- Path to configuration file with users, access rights, profiles of settings, quotas. -->
-    <users_config>users.xml</users_config>
+    <users_config>/etc/clickhouse-server/users.xml</users_config>
 
     <!-- Default profile of settings. -->
     <default_profile>default</default_profile>
@@ -181,6 +198,95 @@ with lib;
         '';
       };
 
+      profiles = mkOption {
+        default = {
+          default = {
+            max_memory_usage = 10000000000;
+            readonly = false;
+          };
+        };
+        description = ''
+          List of user profiles.
+        '';
+        type = with types; attrsOf (submodule {
+          options = {
+
+            max_threads = mkOptions {
+              type = types.nullOr types.int;
+              default = null;
+              description = ''
+                Maximum number of threads for processing a single query.
+              '';
+            };
+
+            max_memory_usage = mkOption {
+              type = types.nullOr types.int;
+              default = null;
+              description = ''
+                Maximum memory usage for processing a single query, in bytes.
+              '';
+            };
+
+            use_uncompressed_cache = mkOption {
+              type = types.bool;
+              default = false;
+              description = ''
+                 Use cache of uncompressed blocks of data. Meaningful only for processing many of very short queries.
+              '';
+            };
+
+            load_balancing = mkOption {
+              type = types.enum [ "random" "nearest_hostname" "in_order" "first_or_random" ];
+              default = "random";
+              description = ''
+                How to choose between replicas during distributed query processing.
+              '';
+            };
+
+            readonly = mkOption {
+              type = types.bool;
+              default = false;
+              description = ''
+                Allow only readonly queries for the profile.
+              '';
+            };
+
+            extraConfig = mkOption {
+              type = types.lines;
+              default = "";
+              description = ''
+                Extra configuration for a profile.
+              '';
+            };
+
+          };
+        });
+      };
+
+      users = mkOption {
+        default = { };
+        description = ''
+          List of user accounts.
+        '';
+        type = with types; attrsOf (submodule {
+          password = mkOption {
+            type = types.nullOr types.str;
+            default = null;
+            description = ''
+              Password of this user.
+
+              NOTE: this is mutually exclusive with password_sha256.
+            '';
+          };
+
+          password_sha256 = mkOption {
+            type = types.nullOr types.str;
+            default = null;
+
+          };
+        });
+      };
+
       extraConfig = mkOption {
         type = types.lines;
         default = '''';
@@ -221,7 +327,7 @@ with lib;
         ConfigurationDirectory = "clickhouse-server";
         StateDirectory = "clickhouse";
         LogsDirectory = "clickhouse";
-        ExecStart = "${pkgs.clickhouse}/bin/clickhouse-server --config-file=${mkConfig cfg}";
+        ExecStart = "${pkgs.clickhouse}/bin/clickhouse-server --config-file=${createConfig cfg}";
       };
     };
 
