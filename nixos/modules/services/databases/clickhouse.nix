@@ -211,7 +211,7 @@ with lib;
         type = with types; attrsOf (submodule {
           options = {
 
-            max_threads = mkOptions {
+            max_threads = mkOption {
               type = types.nullOr types.int;
               default = null;
               description = ''
