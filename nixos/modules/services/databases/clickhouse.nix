@@ -18,6 +18,35 @@ let
     ${p.extraConfig}
   </${n}>
   '';
+
+  createUser = n: u: ''
+  <${n}>
+    <profile>${u.profile}</profile>
+    ${if u.password != null
+        then "<password>"+u.password+"</password>"
+        else ""}
+    ${if u.password_sha256 != null
+        then "<password_sha256_hex>"+u.password_sha256+"</password_sha256_hex>"
+        else ""}
+
+    ${u.extraConfig}
+  </${n}>
+  '';
+
+  createUsersXml = cfg: with lib; pkgs.writeText "users.xml" ''
+<?xml version="1.0"?>
+<yandex>
+  <profiles>
+    ${let names = attrNames cfg.profiles;
+      in strings.concatMapStrings (n: createProfile n (getAttr n cfg.profiles) + "\n") names}
+  </profiles>
+  <users>
+    ${let names = attrNames cfg.users;
+      in strings.concatMapStrings (n: createUser n (getAttr n cfg.users) + "\n") names}
+  </users>
+</yandex>
+  '';
+
   createConfig = cfg: pkgs.writeText "config.xml" ''
 <?xml version="1.0"?>
 <yandex>
@@ -59,10 +88,11 @@ let
     <user_files_path>/var/lib/clickhouse/user_files/</user_files_path>
 
     <!-- Path to configuration file with users, access rights, profiles of settings, quotas. -->
-    <users_config>/etc/clickhouse-server/users.xml</users_config>
+    <!-- <users_config>/etc/clickhouse-server/users.xml</users_config> -->
+    <users_config>${createUsersXml cfg}</users_config>
 
     <!-- Default profile of settings. -->
-    <default_profile>default</default_profile>
+    <default_profile>${cfg.default_profile}</default_profile>
 
     <!-- System profile of settings. This settings are used by internal processes (Buffer storage, Distibuted DDL worker and so on). -->
     <!-- <system_profile>default</system_profile> -->
@@ -190,6 +220,14 @@ with lib;
         '';
       };
 
+      default_profile = mkOption {
+        type = types.str;
+        default = "default";
+        description = ''
+          Default profile to use.
+        '';
+      };
+
       default_database = mkOption {
         type = types.str;
         default = "default";
@@ -264,25 +302,52 @@ with lib;
       };
 
       users = mkOption {
-        default = { };
+        default = {
+          default = {
+            profile = "default";
+          };
+        };
         description = ''
           List of user accounts.
         '';
         type = with types; attrsOf (submodule {
-          password = mkOption {
-            type = types.nullOr types.str;
-            default = null;
-            description = ''
-              Password of this user.
+          options = {
 
-              NOTE: this is mutually exclusive with password_sha256.
-            '';
-          };
+            profile = mkOption {
+              type = types.str;
+              default = "default";
+              description = ''
+                User profile.
+              '';
+            };
 
-          password_sha256 = mkOption {
-            type = types.nullOr types.str;
-            default = null;
+            password = mkOption {
+              type = types.nullOr types.str;
+              default = null;
+              description = ''
+                Password of this user.
 
+                NOTE: this is mutually exclusive with password_sha256.
+              '';
+            };
+
+            password_sha256 = mkOption {
+              type = types.nullOr types.str;
+              default = null;
+              description = ''
+                Sha256 hash from the password.
+
+                NOTE: this is mutually exclusive with password.
+              '';
+            };
+
+            extraConfig = mkOption {
+              type = types.lines;
+              default = "";
+              description = ''
+                Extra user configuration.
+              '';
+            };
           };
         });
       };
@@ -328,12 +393,6 @@ with lib;
         StateDirectory = "clickhouse";
         LogsDirectory = "clickhouse";
         ExecStart = "${pkgs.clickhouse}/bin/clickhouse-server --config-file=${createConfig cfg}";
-      };
-    };
-
-    environment.etc = {
-      "clickhouse-server/users.xml" = {
-        source = "${pkgs.clickhouse}/etc/clickhouse-server/users.xml";
       };
     };
 
