@@ -22,6 +22,10 @@ let
   createUser = n: u: ''
   <${n}>
     <profile>${u.profile}</profile>
+    <quota>${u.quota}</quota>
+    ${if u.password == null && u.password_sha256 == null
+       then "<password></password>"
+       else ""}
     ${if u.password != null
         then "<password>"+u.password+"</password>"
         else ""}
@@ -30,6 +34,12 @@ let
         else ""}
 
     ${u.extraConfig}
+  </${n}>
+  '';
+
+  createQuota = n: q: ''
+  <${n}>
+    ${q.extraConfig}
   </${n}>
   '';
 
@@ -44,6 +54,10 @@ let
     ${let names = attrNames cfg.users;
       in strings.concatMapStrings (n: createUser n (getAttr n cfg.users) + "\n") names}
   </users>
+  <quotas>
+    ${let names = attrNames cfg.quotas;
+      in strings.concatMapStrings (n: createQuota n (getAttr n cfg.quotas) + "\n") names}
+  </quotas>
 </yandex>
   '';
 
@@ -88,7 +102,6 @@ let
     <user_files_path>/var/lib/clickhouse/user_files/</user_files_path>
 
     <!-- Path to configuration file with users, access rights, profiles of settings, quotas. -->
-    <!-- <users_config>/etc/clickhouse-server/users.xml</users_config> -->
     <users_config>${createUsersXml cfg}</users_config>
 
     <!-- Default profile of settings. -->
@@ -321,6 +334,14 @@ with lib;
               '';
             };
 
+            quota = mkOption {
+              type = types.str;
+              default = "default";
+              description = ''
+                User quota.
+              '';
+            };
+
             password = mkOption {
               type = types.nullOr types.str;
               default = null;
@@ -346,6 +367,26 @@ with lib;
               default = "";
               description = ''
                 Extra user configuration.
+              '';
+            };
+          };
+        });
+      };
+
+      quotas = mkOption {
+        default = {
+          default = { };
+        };
+        description = ''
+          List of user quotas.
+        '';
+        type = with types; attrsOf (submodule {
+          options = {
+            extraConfig = mkOption {
+              type = types.lines;
+              default = "";
+              description = ''
+                Extra quota configuration.
               '';
             };
           };
