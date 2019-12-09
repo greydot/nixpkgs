@@ -411,6 +411,14 @@ with lib;
 
   config = mkIf cfg.enable {
 
+    assertions = [
+      {
+        assertion = let checkPasswd = u: (u.password == null) or (u.password_sha256 == null);
+                    in any (u: checkPasswd u) (toList cfg.users);
+        message = "Either password or password_sha256 must be set for all users.";
+      }
+    ];
+
     users.users.clickhouse = {
       name = "clickhouse";
       uid = config.ids.uids.clickhouse;
