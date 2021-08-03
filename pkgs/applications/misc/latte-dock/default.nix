@@ -1,22 +1,21 @@
-{ mkDerivation, lib, cmake, xorg, plasma-framework, fetchurl
+{ mkDerivation, lib, cmake, xorg, plasma-framework, fetchurl, fetchFromGitHub
 , extra-cmake-modules, karchive, kwindowsystem, qtx11extras, kcrash, knewstuff }:
 
 mkDerivation rec {
   pname = "latte-dock";
-  version = "0.9.12";
+  version = "0.10.0";
 
-  src = fetchurl {
-    url = "https://download.kde.org/stable/${pname}/${pname}-${version}.tar.xz";
-    sha256 = "sha256-srivjGnrEizLvph7AP/02dOsnMyTnL3a6f0xm8oGML4=";
-    name = "${pname}-${version}.tar.xz";
+  src = fetchFromGitHub {
+    repo = "latte-dock";
+    owner = "KDE";
+    rev = "2f6808b62608564692a15a28e65a42b8d38b06f3";
+    sha256 = "127ry7236l8xjz20svbm5yryrvcs6j280g3jpqm70yhkpzkqarbv";
   };
 
   buildInputs = [ plasma-framework xorg.libpthreadstubs xorg.libXdmcp xorg.libSM ];
 
   nativeBuildInputs = [ extra-cmake-modules cmake karchive kwindowsystem
     qtx11extras kcrash knewstuff ];
-
-
 
   meta = with lib; {
     description = "Dock-style app launcher based on Plasma frameworks";
@@ -25,6 +24,4 @@ mkDerivation rec {
     platforms = platforms.unix;
     maintainers = [ maintainers.benley maintainers.ysndr ];
   };
-
-
 }
