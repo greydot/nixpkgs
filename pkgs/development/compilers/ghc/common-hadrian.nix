@@ -91,6 +91,8 @@
     && !stdenv.hostPlatform.isStatic,
   elfutils,
 
+  rtsDebug ? false,
+
   # What flavour to build. Flavour string may contain a flavour and flavour
   # transformers as accepted by hadrian.
   ghcFlavour ?
@@ -110,7 +112,8 @@
         # While split sections are now enabled by default in ghc 8.8 for windows,
         # they seem to lead to `too many sections` errors when building base for
         # profiling.
-        ++ lib.optionals (!stdenv.targetPlatform.isWindows) [ "split_sections" ];
+        ++ lib.optionals (!stdenv.targetPlatform.isWindows) [ "split_sections" ]
+        ++ lib.optionals (rtsDebug) [ "debug_ghc" ];
     in
     baseFlavour + lib.concatMapStrings (t: "+${t}") transformers,
 
