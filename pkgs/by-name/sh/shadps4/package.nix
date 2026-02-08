@@ -1,28 +1,24 @@
 {
   lib,
-  gcc14Stdenv,
+  stdenv,
   fetchFromGitHub,
+  makeWrapper,
 
   nixosTests,
   alsa-lib,
   boost,
   cmake,
   cryptopp,
-  game-music-emu,
   glslang,
   ffmpeg,
-  flac,
-  fluidsynth,
   fmt,
   half,
   jack2,
   libdecor,
-  libGL,
   libpulseaudio,
   libunwind,
   libusb1,
-  libvorbis,
-  libxmp,
+  magic-enum,
   libgbm,
   libx11,
   libxcb,
@@ -32,8 +28,6 @@
   libxrandr,
   libxscrnsaver,
   libxtst,
-  magic-enum,
-  mpg123,
   pipewire,
   pkg-config,
   pugixml,
@@ -49,25 +43,25 @@
   vulkan-memory-allocator,
   xbyak,
   xxhash,
+  zenity,
   zlib-ng,
   zydis,
   nix-update-script,
 }:
 
-# relies on std::sinf & co, which was broken in GCC until GCC 14: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=79700
-gcc14Stdenv.mkDerivation (finalAttrs: {
+stdenv.mkDerivation (finalAttrs: {
   pname = "shadps4";
-  version = "0.13.0";
+  version = "0.15.0";
 
   src = fetchFromGitHub {
     owner = "shadps4-emu";
     repo = "shadPS4";
     tag = "v.${finalAttrs.version}";
-    hash = "sha256-zc3zhFTphty/vwioFEOfhgXttpD9MG2F7+YJYcW0H2w=";
+    hash = "sha256-ZYY8PlHEz6jj000Lrllqsk4Da6/CnNdSQHx1+89+yZM=";
     fetchSubmodules = true;
 
     leaveDotGit = true;
-    postFetch = ''
+    postCheckout = ''
       cd "$out"
       git rev-parse --short=8 HEAD > $out/COMMIT
       date -u -d "@$(git log -1 --pretty=%ct)" "+%Y-%m-%dT%H:%M:%SZ" > $out/SOURCE_DATE_EPOCH
@@ -88,21 +82,15 @@ gcc14Stdenv.mkDerivation (finalAttrs: {
     alsa-lib
     boost
     cryptopp
-    game-music-emu
     glslang
     ffmpeg
-    flac
-    fluidsynth
     fmt
     half
     jack2
     libdecor
-    libGL
     libpulseaudio
     libunwind
     libusb1
-    libvorbis
-    libxmp
     libx11
     libxcb
     libxcursor
@@ -111,9 +99,8 @@ gcc14Stdenv.mkDerivation (finalAttrs: {
     libxrandr
     libxscrnsaver
     libxtst
-    libgbm
     magic-enum
-    mpg123
+    libgbm
     pipewire
     pugixml
     rapidjson
@@ -135,6 +122,7 @@ gcc14Stdenv.mkDerivation (finalAttrs: {
   nativeBuildInputs = [
     cmake
     pkg-config
+    makeWrapper
   ];
 
   cmakeFlags = [
@@ -152,6 +140,15 @@ gcc14Stdenv.mkDerivation (finalAttrs: {
     install -Dm644 $src/.github/shadps4.png $out/share/icons/hicolor/512x512/apps/net.shadps4.shadPS4.png
     install -Dm644 -t $out/share/applications $src/dist/net.shadps4.shadPS4.desktop
     install -Dm644 -t $out/share/metainfo $src/dist/net.shadps4.shadPS4.metainfo.xml
+
+    wrapProgram $out/bin/shadps4 \
+      --prefix LD_LIBRARY_PATH : ${
+        lib.makeLibraryPath [
+          libpulseaudio
+          pipewire
+        ]
+      } \
+      --prefix PATH : ${lib.makeBinPath [ zenity ]}
 
     runHook postInstall
   '';
